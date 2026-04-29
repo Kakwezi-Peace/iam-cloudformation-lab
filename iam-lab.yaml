@@ -1,13 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  IAM Lab - Creates IAM Users, Groups, and Permissions
-  with auto-generated password stored in Secrets Manager
+Description: IAM Lab - Creates IAM Users, Groups, and Permissions
 
 Resources:
 
-  # ============================================================
-  # AUTO-GENERATED ONE-TIME PASSWORD stored in Secrets Manager
-  # ============================================================
   IAMUserPassword:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -17,14 +12,9 @@ Resources:
         SecretStringTemplate: '{"username": "lab-users"}'
         GenerateStringKey: password
         PasswordLength: 16
-        ExcludeCharacters: '"@/\'
+        ExcludeCharacters: '"@/\\'
         RequireEachIncludedType: true
 
-  # ============================================================
-  # IAM GROUPS
-  # ============================================================
-
-  # S3 Group - can list S3 buckets only
   S3UserGroup:
     Type: AWS::IAM::Group
     Properties:
@@ -34,20 +24,12 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: AllowListBuckets
-                Effect: Allow
+              - Effect: Allow
                 Action:
                   - s3:ListAllMyBuckets
                   - s3:GetBucketLocation
                 Resource: '*'
-              - Sid: DenyEC2Access
-                Effect: Deny
-                Action:
-                  - ec2:*
-                Resource: '*'
 
-  # EC2 Group - can list EC2 instances, create EC2 instances
-  # EXCEPT ec2-user2 who is blocked from creating instances
   EC2UserGroup:
     Type: AWS::IAM::Group
     Properties:
@@ -57,8 +39,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: AllowEC2ListAndCreate
-                Effect: Allow
+              - Effect: Allow
                 Action:
                   - ec2:DescribeInstances
                   - ec2:DescribeInstanceTypes
@@ -68,17 +49,8 @@ Resources:
                   - ec2:DescribeSubnets
                   - ec2:DescribeVpcs
                   - ec2:RunInstances
-                  - ec2:StartInstances
-                  - ec2:StopInstances
-                  - ec2:TerminateInstances
-                Resource: '*'
-              - Sid: DenyS3Access
-                Effect: Deny
-                Action:
-                  - s3:*
                 Resource: '*'
 
-  # Special deny group for ec2-user2 - prevents creating EC2 instances
   EC2RestrictedGroup:
     Type: AWS::IAM::Group
     Properties:
@@ -88,83 +60,52 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Sid: DenyRunInstances
-                Effect: Deny
+              - Effect: Deny
                 Action:
                   - ec2:RunInstances
                 Resource: '*'
 
-  # ============================================================
-  # IAM USERS
-  # ============================================================
-
-  # ec2-user1 - EC2 Group member, CAN create EC2 instances
   EC2User1:
     Type: AWS::IAM::User
-    DependsOn: IAMUserPassword
     Properties:
       UserName: ec2-user1
       Groups:
         - !Ref EC2UserGroup
       LoginProfile:
-        Password: !Sub
-          - '{{resolve:secretsmanager:${SecretId}:SecretString:password}}'
-          - SecretId: !Ref IAMUserPassword
+        Password: TempPass123!
         PasswordResetRequired: true
 
-  # ec2-user2 - EC2 Group member, but CANNOT create EC2 instances
   EC2User2:
     Type: AWS::IAM::User
-    DependsOn: IAMUserPassword
     Properties:
       UserName: ec2-user2
       Groups:
         - !Ref EC2UserGroup
         - !Ref EC2RestrictedGroup
       LoginProfile:
-        Password: !Sub
-          - '{{resolve:secretsmanager:${SecretId}:SecretString:password}}'
-          - SecretId: !Ref IAMUserPassword
+        Password: TempPass123!
         PasswordResetRequired: true
 
-  # s3-user - S3 Group member only
   S3User:
     Type: AWS::IAM::User
-    DependsOn: IAMUserPassword
     Properties:
       UserName: s3-user
       Groups:
         - !Ref S3UserGroup
       LoginProfile:
-        Password: !Sub
-          - '{{resolve:secretsmanager:${SecretId}:SecretString:password}}'
-          - SecretId: !Ref IAMUserPassword
+        Password: TempPass123!
         PasswordResetRequired: true
 
-# ============================================================
-# OUTPUTS - useful info shown after stack is created
-# ============================================================
 Outputs:
   PasswordSecretName:
-    Description: Name of the Secrets Manager secret holding the temp password
+    Description: Secret holding the temp password
     Value: !Ref IAMUserPassword
-
   EC2User1Name:
-    Description: EC2 User 1 username
+    Description: EC2 User 1
     Value: !Ref EC2User1
-
   EC2User2Name:
-    Description: EC2 User 2 username (cannot create EC2 instances)
+    Description: EC2 User 2
     Value: !Ref EC2User2
-
   S3UserName:
-    Description: S3 User username
+    Description: S3 User
     Value: !Ref S3User
-
-  S3GroupName:
-    Description: S3 User Group name
-    Value: !Ref S3UserGroup
-
-  EC2GroupName:
-    Description: EC2 User Group name
-    Value: !Ref EC2UserGroup
