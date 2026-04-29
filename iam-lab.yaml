@@ -81,7 +81,6 @@ Resources:
       UserName: ec2-user2
       Groups:
         - !Ref EC2UserGroup
-        - !Ref EC2RestrictedGroup
       LoginProfile:
         Password: TempPass123!
         PasswordResetRequired: true
